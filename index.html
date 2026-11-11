@@ -134,7 +134,6 @@
     min-height: 0;
     overflow: auto;
     overscroll-behavior: contain;
-    scroll-snap-type: both mandatory;
     scrollbar-width: none;
     cursor: grab;
     user-select: none;
@@ -157,7 +156,6 @@
     height: var(--ch);
     border-radius: 14px;
     overflow: hidden;
-    scroll-snap-align: center;
     will-change: transform;
     cursor: pointer;
     text-align: left;
@@ -454,6 +452,7 @@ let F = null;          // 現在表示中のグリッドの状態
 let suppressClick = false;
 
 function initField(s, cells) {
+  if (F && F.timer) clearTimeout(F.timer);
   const el = document.getElementById('field');
   const grid = document.getElementById('grid');
   const W = el.clientWidth, H = el.clientHeight;
@@ -465,34 +464,42 @@ function initField(s, cells) {
   grid.style.setProperty('--pady', (H - ch) / 2 + 'px');
 
   const nodes = [...grid.querySelectorAll('.cell')];
-  F = { el, px: cw + gap, py: ch + gap, sel: null,
+  F = { el, px: cw + gap, py: ch + gap, sel: null, timer: null, touching: false, dragging: false,
         cells: cells.map((c, i) => ({ id: c.park.id, r: c.r, c: c.c, el: nodes[i] })) };
 
   // 初期位置: 前回選択していた公園、なければ最寄りの公園
   const start = F.cells.find(c => c.id === s.sel) ||
     F.cells.find(c => c.id === cells.slice().sort((a, b) => a.park.distance - b.park.distance)[0].park.id);
   F.sel = start.id;
-  el.style.scrollSnapType = 'none';
   el.scrollLeft = start.c * F.px;
   el.scrollTop = start.r * F.py;
-  el.style.scrollSnapType = '';
   updateField();
 
+  // スナップはブラウザ任せにしない(CSSのスナップ機能は、端が欠けたグリッドで空きマスに止まったり、
+  // マウスのドラッグを離した瞬間に位置が飛んだりしたため)。スクロールが止まったら、実在する最寄りの公園へ滑らかに寄せる。
   let ticking = false;
   el.addEventListener('scroll', () => {
+    scheduleSettle();
     if (ticking) return;
     ticking = true;
     requestAnimationFrame(() => { ticking = false; updateField(); });
   }, { passive: true });
 
-  // マウス操作用のドラッグスクロール(タッチはネイティブのスクロール)
+  // タッチ: 指を離して慣性スクロールが止まったら寄せる(指を置いている間は寄せない)
+  el.addEventListener('touchstart', () => { F.touching = true; clearTimeout(F.timer); }, { passive: true });
+  const touchEnd = () => { F.touching = false; scheduleSettle(); };
+  el.addEventListener('touchend', touchEnd, { passive: true });
+  el.addEventListener('touchcancel', touchEnd, { passive: true });
+
+  // マウス操作用のドラッグスクロール
   let drag = null;
   el.addEventListener('pointerdown', ev => {
     if (ev.pointerType !== 'mouse' || ev.button !== 0) return;
     // 画面を縮小表示しているときは、ポインタの移動量を縮小率で割ってスクロール量に直す
     const k = el.getBoundingClientRect().width / el.offsetWidth || 1;
-    drag = { x: ev.clientX, y: ev.clientY, l: el.scrollLeft, t: el.scrollTop, k, moved: false };
-    el.style.scrollSnapType = 'none';
+    drag = { x: ev.clientX, y: ev.clientY, l: el.scrollLeft, t: el.scrollTop, k, moved: false, samples: [] };
+    F.dragging = true;
+    clearTimeout(F.timer);
     el.style.cursor = 'grabbing';
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
@@ -503,25 +510,47 @@ function initField(s, cells) {
     if (Math.abs(dx) + Math.abs(dy) > 5) drag.moved = true;
     el.scrollLeft = drag.l - dx / drag.k;
     el.scrollTop = drag.t - dy / drag.k;
+    const now = performance.now();
+    drag.samples.push([now, el.scrollLeft, el.scrollTop]);
+    while (drag.samples.length > 2 && now - drag.samples[0][0] > 100) drag.samples.shift();
   }
   function onUp() {
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('pointerup', onUp);
     if (!drag) return;
-    const moved = drag.moved;
+    const d = drag;
     drag = null;
+    F.dragging = false;
     el.style.cursor = '';
-    el.style.scrollSnapType = '';
-    if (moved) {
-      suppressClick = true;
-      setTimeout(() => { suppressClick = false; }, 0);
-      centerOn(nearestCell().id);
-    }
+    if (!d.moved) return;
+    suppressClick = true;
+    setTimeout(() => { suppressClick = false; }, 0);
+    // 離す直前の速度から行き先を決める(勢いをつけて離すと、その向きの先の公園へ進む)
+    const a = d.samples[0], b = d.samples[d.samples.length - 1];
+    const fling = performance.now() - b[0] < 80 ? 1 : 0;      // 止めてから離したなら勢いは無し
+    const dt = Math.max(1, b[0] - a[0]);
+    const maxL = el.scrollWidth - el.clientWidth, maxT = el.scrollHeight - el.clientHeight;
+    const pl = Math.min(maxL, Math.max(0, el.scrollLeft + fling * (b[1] - a[1]) / dt * 180));
+    const pt = Math.min(maxT, Math.max(0, el.scrollTop + fling * (b[2] - a[2]) / dt * 180));
+    settle(nearestCell(pl / F.px, pt / F.py));
   }
 }
 
-function nearestCell() {
-  const sl = F.el.scrollLeft / F.px, st = F.el.scrollTop / F.py;
+// スクロールが止まって120ms経ったら、最寄りの公園へ寄せる
+function scheduleSettle() {
+  if (!F) return;
+  clearTimeout(F.timer);
+  if (F.touching || F.dragging) return;
+  F.timer = setTimeout(() => settle(), 120);
+}
+function settle(cell) {
+  if (!F || !F.el.isConnected) return;
+  const c = cell || nearestCell();
+  if (Math.abs(c.c * F.px - F.el.scrollLeft) < 0.5 && Math.abs(c.r * F.py - F.el.scrollTop) < 0.5) return;
+  F.el.scrollTo({ left: c.c * F.px, top: c.r * F.py, behavior: 'smooth' });
+}
+
+function nearestCell(sl = F.el.scrollLeft / F.px, st = F.el.scrollTop / F.py) {
   let best = null, bd = Infinity;
   F.cells.forEach(cell => {
     const d = Math.hypot(sl - cell.c, st - cell.r);
@@ -614,7 +643,14 @@ function fitFrame() {
   document.documentElement.style.setProperty('--s', s.toFixed(4));
 }
 fitFrame();
-window.addEventListener('resize', () => { fitFrame(); if (current().v === 'parks') render(); });
+// 画面サイズが実際に変わったときだけ描き直す(同じサイズのresizeで描き直すと、スクロール中に位置が飛ぶ)
+let lastSize = [innerWidth, innerHeight];
+window.addEventListener('resize', () => {
+  fitFrame();
+  if (innerWidth === lastSize[0] && innerHeight === lastSize[1]) return;
+  lastSize = [innerWidth, innerHeight];
+  if (current().v === 'parks') render();
+});
 
 render();
 </script>
