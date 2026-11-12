@@ -213,6 +213,9 @@
 
   /* single */
   .single { padding: 4px 16px; display: flex; flex-direction: column; gap: 14px; }
+  .single .list { padding: 0; }
+  .sec { font-size: 15px; font-weight: 700; margin-top: 4px; display: flex; align-items: center; gap: 8px; }
+  .sec span { font-size: 12px; font-weight: 600; color: var(--sub); }
   .photo-hero {
     height: 170px; border-radius: 18px;
     display: grid; place-items: center;
@@ -324,9 +327,9 @@ function buildGrid(parks) {
 }
 
 /* ---------- ナビゲーション(インタラクションレイヤー) ----------
-   公園コレクション → 公園シングル → 設置遊具コレクション → 遊具シングル
+   公園コレクション → 公園シングル(設置遊具コレクションを内包) → 遊具シングル
    遊具コレクション → 遊具シングル → 公園コレクション(絞り込み)
-   設置遊具のシングルは存在しない。                                   */
+   設置遊具のシングルは存在しない。設置遊具コレクションは公園シングルの中にある。 */
 let stack = [{ v: 'parks' }];
 const current = () => stack[stack.length - 1];
 
@@ -379,9 +382,18 @@ const views = {
     };
   },
 
-  // 公園シングル
+  // 公園シングル: 公園の情報と、その公園の設置遊具コレクションを同じ画面に出す。
+  // 設置遊具のシングルは無いので、遊具をタップすると一般名詞としての遊具シングルへ進む。
   park(s) {
     const p = parkById(s.id);
+    const rows = p.equipment.map(e => {
+      const t = typeById(e.type);
+      return `<button class="row" data-go="type" data-id="${t.id}">
+        ${icon(t)}
+        <span class="body"><div class="t">${esc(t.name)}</div><div class="s">設置場所:${esc(e.place)}</div></span>
+        <span class="chev">›</span>
+      </button>`;
+    }).join('');
     return {
       title: '公園',
       html: `<div class="single">
@@ -394,25 +406,10 @@ const views = {
             <div><b>遊びの対象</b>　${ageLabel(p)}</div>
           </div>
         </div>
-        <button class="cta" data-go="placed" data-id="${p.id}">
-          <span>この公園の遊具を見る(${p.equipment.length})</span><span>›</span>
-        </button>
+        <div class="sec">設置されている遊具<span>${p.equipment.length}</span></div>
+        <div class="list">${rows}</div>
       </div>`
     };
-  },
-
-  // 設置遊具コレクション(公園シングルからのみ到達。シングルは無し→遊具シングルへ)
-  placed(s) {
-    const p = parkById(s.id);
-    const rows = p.equipment.map(e => {
-      const t = typeById(e.type);
-      return `<button class="row" data-go="type" data-id="${t.id}">
-        ${icon(t)}
-        <span class="body"><div class="t">${esc(t.name)}</div><div class="s">設置場所:${esc(e.place)}</div></span>
-        <span class="chev">›</span>
-      </button>`;
-    }).join('');
-    return { title: p.name + ' の遊具', html: `<div class="list">${rows}</div>` };
   },
 
   // 遊具コレクション
