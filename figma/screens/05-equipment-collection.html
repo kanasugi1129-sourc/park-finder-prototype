@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>05 遊具コレクション</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif; color: #111111; background: #e6e6e6; }
+  /* 幅1848px = 余白48×2 + 画面402×4 + 間隔48×3。取り込み幅の初期値(1920px)に収まり、4枚ずつ折り返す */
+  .sheet { display: flex; flex-wrap: wrap; gap: 48px; padding: 48px; align-items: flex-start; width: 1848px; background: #e6e6e6; }
+  .item { display: flex; flex-direction: column; gap: 14px; }
+  .label { font-size: 16px; font-weight: 700; color: #111111; }
+
+  /* iPhone 17 の画面: 402 x 874 (セーフエリア 上62 / 下34) */
+  .screen { position: relative; width: 402px; height: 874px; background: #f5f5f5; display: flex; flex-direction: column; overflow: hidden; }
+  .top { flex: none; height: 114px; padding: 62px 16px 0; display: flex; align-items: center; gap: 8px; }
+  .top h1 { font-size: 18px; font-weight: 700; flex: 1; }
+  .top .note { font-size: 11px; color: #777777; }
+  .back { width: 36px; height: 36px; border-radius: 18px; background: #ffffff; border: 1px solid #dddddd; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .body { flex: 1; overflow: hidden; }
+  .tabs { flex: none; height: 80px; display: flex; padding-bottom: 34px; background: #ffffff; border-top: 1px solid #dddddd; }
+  .tab { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #777777; border-top: 3px solid transparent; margin-top: -1px; }
+  .tab.on { color: #111111; border-top: 3px solid #111111; }
+
+  /* 公園コレクション: 位置・サイズはすべて数値(中央は 1.36 倍で書き出し済み) */
+  .banner { flex: none; height: 82px; margin: 0 16px 8px; padding: 10px 12px; background: #ececec; border: 1px solid #111111; border-radius: 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .banner .txt { flex: 1; }
+  .banner .l1 b { font-size: 15px; }
+  .bchips { display: flex; gap: 6px; margin-top: 6px; }
+  .bchip { padding: 5px 10px; border-radius: 999px; background: #ffffff; border: 1px solid #111111; font-size: 12px; font-weight: 700; }
+  .clear { padding: 6px 12px; border-radius: 999px; background: #ffffff; border: 1px solid #111111; font-size: 12px; font-weight: 700; }
+  .field { position: relative; flex: none; width: 402px; overflow: hidden; }
+  .cell { position: absolute; border-radius: 14px; overflow: hidden; }
+  .cell.sel { border-radius: 19px; box-shadow: 0 0 0 4.1px #111111, 0 13.6px 35.4px rgba(0,0,0,0.25); }
+  .photo { position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+  .ph1 { font-size: 14px; font-weight: 600; color: rgba(0,0,0,0.42); }
+  .ph2 { font-size: 11px; font-weight: 500; color: rgba(0,0,0,0.42); }
+  .veil { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: rgba(245,245,245,0.32); }
+  .info { position: absolute; left: 0; right: 0; bottom: 0; padding: 38.1px 12.2px 12.2px; color: #ffffff; background: linear-gradient(to bottom, rgba(0,0,0,0), rgba(0,0,0,0.66)); }
+  .info .n { font-size: 17.7px; font-weight: 700; line-height: 1.3; }
+  .info .m { font-size: 14.3px; margin-top: 2.7px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4.1px; margin-top: 8.2px; }
+  .chip { font-size: 13.6px; font-weight: 600; line-height: 1; padding: 6.8px 10.9px; border-radius: 999px; background: rgba(255,255,255,0.24); color: #ffffff; }
+  .chip.hi { background: #ffffff; color: #111111; }
+
+  /* 一覧・シングル */
+  .list { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+  .row { display: flex; align-items: center; gap: 12px; background: #ffffff; border: 1px solid #dddddd; border-radius: 14px; padding: 12px; }
+  .row .body2 { flex: 1; }
+  .row .t { font-size: 15px; font-weight: 700; }
+  .row .s { font-size: 12px; color: #777777; margin-top: 2px; line-height: 1.5; }
+  .chev { color: #777777; }
+  .ico { width: 34px; height: 34px; border-radius: 17px; background: #222222; color: #ffffff; font-size: 15px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+  .single { padding: 4px 16px; display: flex; flex-direction: column; gap: 14px; }
+  .photo-hero { height: 170px; border-radius: 18px; display: flex; align-items: center; justify-content: center; color: rgba(0,0,0,0.42); font-size: 15px; font-weight: 600; }
+  .hero { background: #ffffff; border: 1px solid #dddddd; border-radius: 18px; padding: 18px; }
+  .hero h2 { font-size: 22px; margin-bottom: 8px; }
+  .thead { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .thead h2 { margin: 0; }
+  .meta { font-size: 14px; color: #777777; line-height: 1.7; }
+  .meta b { color: #111111; }
+  .meta.mt { margin-top: 10px; }
+  .desc { font-size: 15px; line-height: 1.8; }
+  .cta { background: #111111; color: #ffffff; border-radius: 14px; padding: 14px 16px; font-size: 15px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+
+  html, body { width: 402px; height: 874px; margin: 0; overflow: hidden; background: #f5f5f5; }
+</style>
+</head>
+<body>
+<section class="screen" id="screen-05-equipment-collection"><header class="top"><h1>遊具</h1></header><div class="body"><div class="list"><div class="row"><div class="ico">す</div><div class="body2"><div class="t">すべり台</div><div class="s">対象年齢の目安 2〜8歳</div></div><div class="chev">›</div></div><div class="row"><div class="ico">ブ</div><div class="body2"><div class="t">ブランコ</div><div class="s">対象年齢の目安 3〜10歳</div></div><div class="chev">›</div></div><div class="row"><div class="ico">砂</div><div class="body2"><div class="t">砂場</div><div class="s">対象年齢の目安 1〜5歳</div></div><div class="chev">›</div></div><div class="row"><div class="ico">シ</div><div class="body2"><div class="t">シーソー</div><div class="s">対象年齢の目安 4〜10歳</div></div><div class="chev">›</div></div><div class="row"><div class="ico">ジ</div><div class="body2"><div class="t">ジャングルジム</div><div class="s">対象年齢の目安 5〜12歳</div></div><div class="chev">›</div></div><div class="row"><div class="ico">鉄</div><div class="body2"><div class="t">鉄棒</div><div class="s">対象年齢の目安 5〜12歳</div></div><div class="chev">›</div></div><div class="row"><div class="ico">ス</div><div class="body2"><div class="t">スプリング遊具</div><div class="s">対象年齢の目安 1〜4歳</div></div><div class="chev">›</div></div><div class="row"><div class="ico">タ</div><div class="body2"><div class="t">ターザンロープ</div><div class="s">対象年齢の目安 6〜12歳</div></div><div class="chev">›</div></div><div class="row"><div class="ico">複</div><div class="body2"><div class="t">複合遊具</div><div class="s">対象年齢の目安 3〜10歳</div></div><div class="chev">›</div></div></div></div><nav class="tabs"><div class="tab">公園</div><div class="tab on">遊具</div></nav></section>
+</body>
+</html>
