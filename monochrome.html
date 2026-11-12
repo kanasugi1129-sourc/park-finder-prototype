@@ -127,7 +127,7 @@
   }
 
   /* ---- 公園コレクション: 2次元グリッド ----
-     縦 = 近さ(上が近い) / 横 = 遊びの対象年齢(左が幼児向け、右が大きい子向け)
+     縦 = 近さ(下が近い) / 横 = 遊びの対象年齢(左が幼児向け、右が大きい子向け)
      中央に寄ったセルが拡大して前面に出る */
   .field {
     flex: 1;
@@ -305,14 +305,16 @@ const ageLabel = p => { const s = ageScore(p); return s < 4.5 ? '幼児向け' :
 const PHOTO_GRAYS = [78, 70, 82, 74, 66, 76];
 const photoBg = id => `hsl(0 0% ${PHOTO_GRAYS[num(id) % PHOTO_GRAYS.length]}%)`;
 
-/* グリッド配置: 距離順に4件ずつ行にする(縦=近さ)。各行の中は対象年齢スコア順(横=幼児向け→大きい子向け) */
+/* グリッド配置: 距離順に4件ずつ行にする(縦=近さ。手前=下が現在地に近い)。各行の中は対象年齢スコア順(横=幼児向け→大きい子向け) */
 const COLS = 4;
 function buildGrid(parks) {
   const sorted = parks.slice().sort((a, b) => a.distance - b.distance);
+  const rows = Math.ceil(sorted.length / COLS);
   const cells = [];
-  for (let r = 0; r * COLS < sorted.length; r++) {
-    const row = sorted.slice(r * COLS, r * COLS + COLS).sort((a, b) => ageScore(a) - ageScore(b));
-    row.forEach((p, c) => cells.push({ park: p, r, c }));
+  for (let i = 0; i < rows; i++) {
+    const row = sorted.slice(i * COLS, i * COLS + COLS).sort((a, b) => ageScore(a) - ageScore(b));
+    // 最寄りの行(i=0)を最下段に置く。上へ進むほど遠くなる
+    row.forEach((p, c) => cells.push({ park: p, r: rows - 1 - i, c }));
   }
   return cells;
 }
